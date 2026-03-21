@@ -10,7 +10,7 @@
         video { width: 100%; max-width: 400px; border: 3px solid #333; border-radius: 8px; background: #000; }
         button { background-color: #28a745; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; margin-top: 20px; cursor: pointer; width: 100%; max-width: 400px; }
         button:disabled { background-color: #ccc; }
-        #status { margin-top: 15px; font-style: italic; color: #555; }
+        #status { margin-top: 15px; font-style: italic; color: #555; font-weight: bold; }
         .dashboard { margin-top: 30px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: none; max-width: 400px; margin-left: auto; margin-right: auto; }
         .dashboard h2 { margin: 0 0 10px 0; color: #333; }
         .data-row { font-size: 20px; font-weight: bold; color: #007bff; margin: 10px 0; }
@@ -44,7 +44,7 @@
         // Plant names matching your Arduino Array
         const plantNames = ["Eggplant", "Sili", "Pechay", "Tomato", "Okra"];
 
-        // 1. Request access to the phone's back camera
+        // Request access to the phone's back camera
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then(stream => {
                 video.srcObject = stream;
@@ -54,7 +54,7 @@
                 statusTxt.style.color = "red";
             });
 
-        // 2. Handle the Scan Button Click
+        // Handle the Scan Button Click
         scanBtn.addEventListener('click', () => {
             scanBtn.disabled = true;
             statusTxt.innerText = "Analyzing image... please wait.";
@@ -65,23 +65,21 @@
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // 3. Run Tesseract OCR on the snapshot
+            // Run Tesseract OCR on the snapshot
             Tesseract.recognize(
                 canvas,
                 'eng',
                 { logger: m => console.log(m) }
             ).then(({ data: { text } }) => {
-                console.log("Raw OCR text:", text);
                 
                 // --- THE SMART FILTER ---
                 // Convert everything to uppercase and remove ALL spaces/weird characters
                 let cleanText = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
                 // Replace the letter 'O' with the number '0'
                 cleanText = cleanText.replace(/O/g, '0'); 
-                console.log("Cleaned text:", cleanText);
                 // ------------------------
 
-                // 4. Use Regex to find the format "P[number]W[number]"
+                // Use Regex to find the format "P[number]W[number]"
                 const regex = /P(\d+)W(\d+)/;
                 const match = cleanText.match(regex);
 
@@ -97,7 +95,8 @@
                     statusTxt.style.color = "green";
                     resultBoard.style.display = "block";
                 } else {
-                    statusTxt.innerText = "Could not read LCD pixels. Adjust angle and try again.";
+                    // DIAGNOSTIC OUTPUT: Show exactly what the camera saw
+                    statusTxt.innerText = "Failed. Camera read: [" + cleanText + "]. Adjust angle/contrast.";
                     statusTxt.style.color = "red";
                 }
                 scanBtn.disabled = false;
