@@ -3,104 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Irrigation Scanner</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <title>Smart Irrigation Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
-        video { width: 100%; max-width: 400px; border: 3px solid #333; border-radius: 8px; background: #000; }
-        button { background-color: #28a745; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; margin-top: 20px; cursor: pointer; width: 100%; max-width: 400px; }
-        button:disabled { background-color: #ccc; }
-        #status { margin-top: 15px; font-style: italic; color: #555; font-weight: bold; }
-        .dashboard { margin-top: 30px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: none; max-width: 400px; margin-left: auto; margin-right: auto; }
-        .dashboard h2 { margin: 0 0 10px 0; color: #333; }
-        .data-row { font-size: 20px; font-weight: bold; color: #007bff; margin: 10px 0; }
+        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-top: 0; }
+        p.instructions { color: #666; font-size: 14px; margin-bottom: 20px; }
+        
+        input[type="text"] { width: 90%; padding: 15px; font-size: 22px; font-weight: bold; text-align: center; border: 2px solid #ccc; border-radius: 8px; text-transform: uppercase; letter-spacing: 2px; }
+        input[type="text"]:focus { outline: none; border-color: #007bff; }
+        
+        button { background-color: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; margin-top: 20px; cursor: pointer; width: 100%; transition: 0.2s; }
+        button:hover { background-color: #0056b3; }
+        
+        #status { margin-top: 20px; font-style: italic; font-weight: bold; }
+        
+        .dashboard { margin-top: 30px; padding: 20px; background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; display: none; }
+        .dashboard h3 { margin: 0 0 15px 0; color: #333; }
+        .data-row { font-size: 22px; font-weight: bold; color: #28a745; margin: 12px 0; }
+        .label { font-size: 16px; color: #555; font-weight: normal; display: block; margin-bottom: 2px; }
     </style>
 </head>
 <body>
 
-    <h2>Scan LCD Screen</h2>
-    
-    <video id="cameraFeed" autoplay playsinline></video>
-    <canvas id="snapshotCanvas" style="display:none;"></canvas>
-    
-    <br>
-    <button id="scanBtn">📸 Scan History Code</button>
-    <p id="status">Point camera at the LCD and press Scan...</p>
+    <div class="container">
+        <h2>System Sync</h2>
+        <p class="instructions">Read the sync code from your Arduino LCD screen and enter it below (e.g., P0W0015)</p>
 
-    <div class="dashboard" id="resultBoard">
-        <h2>System History</h2>
-        <div class="data-row">Plant: <span id="plantName">--</span></div>
-        <div class="data-row">Total Waterings: <span id="waterCount">--</span></div>
+        <input type="text" id="codeInput" placeholder="P0W0015" autocomplete="off">
+        <br>
+        <button id="submitBtn">Analyze Data</button>
+        <p id="status"></p>
+
+        <div class="dashboard" id="resultBoard">
+            <h3>System History</h3>
+            <div class="data-row"><span class="label">Target Plant:</span> <span id="plantName">--</span></div>
+            <div class="data-row"><span class="label">Total Waterings:</span> <span id="waterCount">--</span></div>
+        </div>
     </div>
 
     <script>
-        const video = document.getElementById('cameraFeed');
-        const canvas = document.getElementById('snapshotCanvas');
-        const context = canvas.getContext('2d');
-        const scanBtn = document.getElementById('scanBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const codeInput = document.getElementById('codeInput');
         const statusTxt = document.getElementById('status');
         const resultBoard = document.getElementById('resultBoard');
-        
+
         // Plant names matching your Arduino Array
         const plantNames = ["Eggplant", "Sili", "Pechay", "Tomato", "Okra"];
 
-        // Request access to the phone's back camera
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(err => {
-                statusTxt.innerText = "Camera access denied or unavailable.";
+        // Trigger button click when pressing "Enter" on keyboard
+        codeInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                submitBtn.click();
+            }
+        });
+
+        submitBtn.addEventListener('click', () => {
+            // Get the text, make it uppercase, remove all spaces and weird characters
+            let rawText = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            // Replace the letter 'O' with the number '0' just in case of typos
+            let cleanText = rawText.replace(/O/g, '0');
+
+            if (cleanText === "") {
+                statusTxt.innerText = "Please enter a code first.";
                 statusTxt.style.color = "red";
-            });
+                resultBoard.style.display = "none";
+                return;
+            }
 
-        // Handle the Scan Button Click
-        scanBtn.addEventListener('click', () => {
-            scanBtn.disabled = true;
-            statusTxt.innerText = "Analyzing image... please wait.";
-            resultBoard.style.display = "none";
+            // Use Regex to find the format "P[number]W[number]"
+            const regex = /P(\d+)W(\d+)/;
+            const match = cleanText.match(regex);
 
-            // Set canvas size to match video and draw the current frame
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            if (match) {
+                const plantId = parseInt(match[1]);
+                const waterings = parseInt(match[2]);
 
-            // Run Tesseract OCR on the snapshot
-            Tesseract.recognize(
-                canvas,
-                'eng',
-                { logger: m => console.log(m) }
-            ).then(({ data: { text } }) => {
-                
-                // --- THE SMART FILTER ---
-                // Convert everything to uppercase and remove ALL spaces/weird characters
-                let cleanText = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                // Replace the letter 'O' with the number '0'
-                cleanText = cleanText.replace(/O/g, '0'); 
-                // ------------------------
+                // Update Dashboard
+                document.getElementById('plantName').innerText = plantNames[plantId] || "Unknown";
+                document.getElementById('waterCount').innerText = waterings;
 
-                // Use Regex to find the format "P[number]W[number]"
-                const regex = /P(\d+)W(\d+)/;
-                const match = cleanText.match(regex);
-
-                if (match) {
-                    const plantId = parseInt(match[1]);
-                    const waterings = parseInt(match[2]);
-
-                    // Update Dashboard
-                    document.getElementById('plantName').innerText = plantNames[plantId] || "Unknown";
-                    document.getElementById('waterCount').innerText = waterings;
-                    
-                    statusTxt.innerText = "Scan Successful!";
-                    statusTxt.style.color = "green";
-                    resultBoard.style.display = "block";
-                } else {
-                    // DIAGNOSTIC OUTPUT: Show exactly what the camera saw
-                    statusTxt.innerText = "Failed. Camera read: [" + cleanText + "]. Adjust angle/contrast.";
-                    statusTxt.style.color = "red";
-                }
-                scanBtn.disabled = false;
-            });
+                statusTxt.innerText = "Data Synced Successfully!";
+                statusTxt.style.color = "green";
+                resultBoard.style.display = "block";
+            } else {
+                statusTxt.innerText = "Invalid format. Make sure it looks like P0W0015.";
+                statusTxt.style.color = "red";
+                resultBoard.style.display = "none";
+            }
         });
     </script>
 </body>
