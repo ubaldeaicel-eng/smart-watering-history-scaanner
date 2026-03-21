@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Irrigation Scanner</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
+        video { width: 100%; max-width: 400px; border: 3px solid #333; border-radius: 8px; background: #000; }
+        button { background-color: #28a745; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; margin-top: 20px; cursor: pointer; width: 100%; max-width: 400px; }
+        button:disabled { background-color: #ccc; }
+        #status { margin-top: 15px; font-style: italic; color: #555; }
+        .dashboard { margin-top: 30px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: none; max-width: 400px; margin-left: auto; margin-right: auto; }
+        .dashboard h2 { margin: 0 0 10px 0; color: #333; }
+        .data-row { font-size: 20px; font-weight: bold; color: #007bff; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <h2>Scan LCD Screen</h2>
+    
+    <video id="cameraFeed" autoplay playsinline></video>
+    <canvas id="snapshotCanvas" style="display:none;"></canvas>
+    
+    <br>
+    <button id="scanBtn">📸 Scan History Code</button>
+    <p id="status">Point camera at the LCD and press Scan...</p>
+
+    <div class="dashboard" id="resultBoard">
+        <h2>System History</h2>
+        <div class="data-row">Plant: <span id="plantName">--</span></div>
+        <div class="data-row">Total Waterings: <span id="waterCount">--</span></div>
+    </div>
+
+    <script>
+        const video = document.getElementById('cameraFeed');
+        const canvas = document.getElementById('snapshotCanvas');
+        const context = canvas.getContext('2d');
+        const scanBtn = document.getElementById('scanBtn');
+        const statusTxt = document.getElementById('status');
+        const resultBoard = document.getElementById('resultBoard');
+        
+        // Plant names matching your Arduino Array
+        const plantNames = ["Eggplant", "Sili", "Pechay", "Tomato", "Okra"];
+
+        // 1. Request access to the phone's back camera
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                statusTxt.innerText = "Camera access denied or unavailable.";
+                statusTxt.style.color = "red";
+            });
+
+        // 2. Handle the Scan Button Click
+        scanBtn.addEventListener('click', () => {
+            scanBtn.disabled = true;
+            statusTxt.innerText = "Analyzing image... please wait.";
+            resultBoard.style.display = "none";
+
+            // Set canvas size to match video and draw the current frame
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // 3. Run Tesseract OCR on the snapshot
+            Tesseract.recognize(
+                canvas,
+                'eng',
+                { logger: m => console.log(m) }
+            ).then(({ data: { text } }) => {
+                console.log("Raw OCR text:", text);
+                
+                // --- THE SMART FILTER ---
+                // Convert everything to uppercase and remove ALL spaces/weird characters
+                let cleanText = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                // Replace the letter 'O' with the number '0'
+                cleanText = cleanText.replace(/O/g, '0'); 
+                console.log("Cleaned text:", cleanText);
+                // ------------------------
+
+                // 4. Use Regex to find the format "P[number]W[number]"
+                const regex = /P(\d+)W(\d+)/;
+                const match = cleanText.match(regex);
+
+                if (match) {
+                    const plantId = parseInt(match[1]);
+                    const waterings = parseInt(match[2]);
+
+                    // Update Dashboard
+                    document.getElementById('plantName').innerText = plantNames[plantId] || "Unknown";
+                    document.getElementById('waterCount').innerText = waterings;
+                    
+                    statusTxt.innerText = "Scan Successful!";
+                    statusTxt.style.color = "green";
+                    resultBoard.style.display = "block";
+                } else {
+                    statusTxt.innerText = "Could not read LCD pixels. Adjust angle and try again.";
+                    statusTxt.style.color = "red";
+                }
+                scanBtn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>
