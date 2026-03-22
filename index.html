@@ -3,102 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Irrigation Dashboard</title>
+    <title>Smart Watering Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f9; padding: 20px; }
-        .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; padding: 20px; display: flex; justify-content: center;}
+        .container { max-width: 450px; width: 100%; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;}
         h2 { color: #333; margin-top: 0; }
         p.instructions { color: #666; font-size: 14px; margin-bottom: 20px; }
         
-        input[type="text"] { width: 90%; padding: 15px; font-size: 22px; font-weight: bold; text-align: center; border: 2px solid #ccc; border-radius: 8px; text-transform: uppercase; letter-spacing: 2px; }
+        input[type="text"] { width: 85%; padding: 15px; font-size: 24px; font-weight: bold; text-align: center; border: 2px solid #ccc; border-radius: 8px; text-transform: uppercase; letter-spacing: 4px; }
         input[type="text"]:focus { outline: none; border-color: #007bff; }
         
-        button { background-color: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; margin-top: 20px; cursor: pointer; width: 100%; transition: 0.2s; }
+        button { background-color: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; margin-top: 20px; cursor: pointer; width: 100%; }
         button:hover { background-color: #0056b3; }
         
-        #status { margin-top: 20px; font-style: italic; font-weight: bold; }
+        #statusTxt { margin-top: 15px; font-weight: bold; }
         
-        .dashboard { margin-top: 30px; padding: 20px; background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; display: none; }
-        .dashboard h3 { margin: 0 0 15px 0; color: #333; }
-        .data-row { font-size: 20px; font-weight: bold; color: #333; margin: 12px 0; }
-        .label { font-size: 14px; color: #777; font-weight: normal; display: block; margin-bottom: 2px; text-transform: uppercase;}
+        .dashboard { margin-top: 25px; padding: 20px; background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; display: none; text-align: left;}
+        .dashboard h3 { margin: 0 0 15px 0; color: #333; text-align: center;}
         
-        #lockStatus { padding: 5px 10px; border-radius: 5px; color: white; }
-        .safe { background-color: #28a745; }
-        .danger { background-color: #dc3545; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; font-size: 16px; }
+        th { background-color: #007bff; color: white; }
+        .alert-box { padding: 10px; border-radius: 5px; font-weight: bold; text-align: center; margin-top: 10px; }
+        
+        .status-ok { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-heat { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .status-rain { background-color: #cce5ff; color: #004085; border: 1px solid #b8daff; }
+        .status-fault { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h2>System Sync</h2>
-        <p class="instructions">Enter the 8-character sync code from your Arduino LCD (e.g., P0W0015L0)</p>
+        <p class="instructions">Enter the 7-character code from the LCD (e.g., 20100-H)</p>
 
-        <input type="text" id="codeInput" placeholder="P0W0015L0" autocomplete="off" maxlength="10">
+        <input type="text" id="codeInput" placeholder="00000-O" autocomplete="off" maxlength="7">
         <br>
         <button id="submitBtn">Analyze Data</button>
-        <p id="status"></p>
+        <p id="statusTxt"></p>
 
         <div class="dashboard" id="resultBoard">
-            <h3>System History</h3>
-            <div class="data-row"><span class="label">Target Plant:</span> <span id="plantName" style="color:#007bff;">--</span></div>
-            <div class="data-row"><span class="label">Total Waterings:</span> <span id="waterCount" style="color:#007bff;">--</span></div>
-            <div class="data-row"><span class="label">System Status:</span> <span id="lockStatus">--</span></div>
+            <h3>Daily Watering Cycle</h3>
+            <table>
+                <tr><th>Crop</th><th>Waterings Today</th></tr>
+                <tr><td>Eggplant</td><td id="count-0">--</td></tr>
+                <tr><td>Sili</td><td id="count-1">--</td></tr>
+                <tr><td>Pechay</td><td id="count-2">--</td></tr>
+                <tr><td>Tomato</td><td id="count-3">--</td></tr>
+                <tr><td>Okra</td><td id="count-4">--</td></tr>
+            </table>
+            
+            <div id="sysStatus" class="alert-box">System Status: --</div>
         </div>
     </div>
 
     <script>
         const submitBtn = document.getElementById('submitBtn');
         const codeInput = document.getElementById('codeInput');
-        const statusTxt = document.getElementById('status');
+        const statusTxt = document.getElementById('statusTxt');
         const resultBoard = document.getElementById('resultBoard');
-
-        const plantNames = ["Eggplant", "Sili", "Pechay", "Tomato", "Okra"];
-        
-        // Lockout Dictionary
-        const lockCodes = {
-            0: { text: "SAFE & CLEAR", class: "safe" },
-            1: { text: "RAIN LOCK ACTIVE", class: "danger" },
-            2: { text: "HEAT LOCK ACTIVE", class: "danger" },
-            3: { text: "STORM ALERT", class: "danger" },
-            4: { text: "HARDWARE FAULT", class: "danger" }
-        };
+        const sysStatus = document.getElementById('sysStatus');
 
         codeInput.addEventListener("keypress", function(event) {
-            if (event.key === "Enter") { event.preventDefault(); submitBtn.click(); }
+            if (event.key === "Enter") submitBtn.click();
         });
 
         submitBtn.addEventListener('click', () => {
-            let rawText = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-            let cleanText = rawText.replace(/O/g, '0');
+            // Clean the input to uppercase and remove spaces
+            let code = codeInput.value.toUpperCase().replace(/\s/g, '');
 
-            if (cleanText === "") {
-                statusTxt.innerText = "Please enter a code first."; statusTxt.style.color = "red";
-                resultBoard.style.display = "none"; return;
-            }
-
-            // Regex now looks for P[num] W[num] L[num]
-            const regex = /P(\d+)W(\d+)L(\d+)/;
-            const match = cleanText.match(regex);
+            // Regex for format: 5 numbers, a dash, and one letter (O, H, R, or F)
+            const regex = /^(\d)(\d)(\d)(\d)(\d)-([OHRF])$/;
+            const match = code.match(regex);
 
             if (match) {
-                const plantId = parseInt(match[1]);
-                const waterings = parseInt(match[2]);
-                const lockId = parseInt(match[3]);
+                // Populate the table with the 5 numbers
+                document.getElementById('count-0').innerText = match[1];
+                document.getElementById('count-1').innerText = match[2];
+                document.getElementById('count-2').innerText = match[3];
+                document.getElementById('count-3').innerText = match[4];
+                document.getElementById('count-4').innerText = match[5];
 
-                document.getElementById('plantName').innerText = plantNames[plantId] || "Unknown";
-                document.getElementById('waterCount').innerText = waterings;
+                // Decode the Status Letter
+                const statusCode = match[6];
+                sysStatus.className = "alert-box"; // reset classes
                 
-                // Update Lockout UI
-                const lockUI = document.getElementById('lockStatus');
-                const lockData = lockCodes[lockId] || { text: "UNKNOWN ERROR", class: "danger" };
-                lockUI.innerText = lockData.text;
-                lockUI.className = lockData.class; // Applies green or red background
+                if (statusCode === 'O') {
+                    sysStatus.innerText = "System Status: NORMAL (Monitoring)";
+                    sysStatus.classList.add("status-ok");
+                } else if (statusCode === 'H') {
+                    sysStatus.innerText = "System Status: HEAT LOCK (Delayed)";
+                    sysStatus.classList.add("status-heat");
+                } else if (statusCode === 'R') {
+                    sysStatus.innerText = "System Status: RAIN LOCK (Delayed)";
+                    sysStatus.classList.add("status-rain");
+                } else if (statusCode === 'F') {
+                    sysStatus.innerText = "System Status: FAULT DETECTED";
+                    sysStatus.classList.add("status-fault");
+                }
 
-                statusTxt.innerText = "Data Synced Successfully!"; statusTxt.style.color = "green";
+                statusTxt.innerText = "Data Synced Successfully!";
+                statusTxt.style.color = "green";
                 resultBoard.style.display = "block";
             } else {
-                statusTxt.innerText = "Invalid format. Expected format: P0W0015L0"; statusTxt.style.color = "red";
+                statusTxt.innerText = "Invalid code. Must be 5 numbers and a letter (e.g. 20100-H)";
+                statusTxt.style.color = "red";
                 resultBoard.style.display = "none";
             }
         });
