@@ -20,25 +20,30 @@
         
         .dashboard { margin-top: 30px; padding: 20px; background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; display: none; }
         .dashboard h3 { margin: 0 0 15px 0; color: #333; }
-        .data-row { font-size: 22px; font-weight: bold; color: #28a745; margin: 12px 0; }
-        .label { font-size: 16px; color: #555; font-weight: normal; display: block; margin-bottom: 2px; }
+        .data-row { font-size: 20px; font-weight: bold; color: #333; margin: 12px 0; }
+        .label { font-size: 14px; color: #777; font-weight: normal; display: block; margin-bottom: 2px; text-transform: uppercase;}
+        
+        #lockStatus { padding: 5px 10px; border-radius: 5px; color: white; }
+        .safe { background-color: #28a745; }
+        .danger { background-color: #dc3545; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h2>System Sync</h2>
-        <p class="instructions">Read the sync code from your Arduino LCD screen and enter it below (e.g., P0W0015)</p>
+        <p class="instructions">Enter the 8-character sync code from your Arduino LCD (e.g., P0W0015L0)</p>
 
-        <input type="text" id="codeInput" placeholder="P0W0015" autocomplete="off">
+        <input type="text" id="codeInput" placeholder="P0W0015L0" autocomplete="off" maxlength="10">
         <br>
         <button id="submitBtn">Analyze Data</button>
         <p id="status"></p>
 
         <div class="dashboard" id="resultBoard">
             <h3>System History</h3>
-            <div class="data-row"><span class="label">Target Plant:</span> <span id="plantName">--</span></div>
-            <div class="data-row"><span class="label">Total Waterings:</span> <span id="waterCount">--</span></div>
+            <div class="data-row"><span class="label">Target Plant:</span> <span id="plantName" style="color:#007bff;">--</span></div>
+            <div class="data-row"><span class="label">Total Waterings:</span> <span id="waterCount" style="color:#007bff;">--</span></div>
+            <div class="data-row"><span class="label">System Status:</span> <span id="lockStatus">--</span></div>
         </div>
     </div>
 
@@ -48,48 +53,52 @@
         const statusTxt = document.getElementById('status');
         const resultBoard = document.getElementById('resultBoard');
 
-        // Plant names matching your Arduino Array
         const plantNames = ["Eggplant", "Sili", "Pechay", "Tomato", "Okra"];
+        
+        // Lockout Dictionary
+        const lockCodes = {
+            0: { text: "SAFE & CLEAR", class: "safe" },
+            1: { text: "RAIN LOCK ACTIVE", class: "danger" },
+            2: { text: "HEAT LOCK ACTIVE", class: "danger" },
+            3: { text: "STORM ALERT", class: "danger" },
+            4: { text: "HARDWARE FAULT", class: "danger" }
+        };
 
-        // Trigger button click when pressing "Enter" on keyboard
         codeInput.addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                submitBtn.click();
-            }
+            if (event.key === "Enter") { event.preventDefault(); submitBtn.click(); }
         });
 
         submitBtn.addEventListener('click', () => {
-            // Get the text, make it uppercase, remove all spaces and weird characters
             let rawText = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-            // Replace the letter 'O' with the number '0' just in case of typos
             let cleanText = rawText.replace(/O/g, '0');
 
             if (cleanText === "") {
-                statusTxt.innerText = "Please enter a code first.";
-                statusTxt.style.color = "red";
-                resultBoard.style.display = "none";
-                return;
+                statusTxt.innerText = "Please enter a code first."; statusTxt.style.color = "red";
+                resultBoard.style.display = "none"; return;
             }
 
-            // Use Regex to find the format "P[number]W[number]"
-            const regex = /P(\d+)W(\d+)/;
+            // Regex now looks for P[num] W[num] L[num]
+            const regex = /P(\d+)W(\d+)L(\d+)/;
             const match = cleanText.match(regex);
 
             if (match) {
                 const plantId = parseInt(match[1]);
                 const waterings = parseInt(match[2]);
+                const lockId = parseInt(match[3]);
 
-                // Update Dashboard
                 document.getElementById('plantName').innerText = plantNames[plantId] || "Unknown";
                 document.getElementById('waterCount').innerText = waterings;
+                
+                // Update Lockout UI
+                const lockUI = document.getElementById('lockStatus');
+                const lockData = lockCodes[lockId] || { text: "UNKNOWN ERROR", class: "danger" };
+                lockUI.innerText = lockData.text;
+                lockUI.className = lockData.class; // Applies green or red background
 
-                statusTxt.innerText = "Data Synced Successfully!";
-                statusTxt.style.color = "green";
+                statusTxt.innerText = "Data Synced Successfully!"; statusTxt.style.color = "green";
                 resultBoard.style.display = "block";
             } else {
-                statusTxt.innerText = "Invalid format. Make sure it looks like P0W0015.";
-                statusTxt.style.color = "red";
+                statusTxt.innerText = "Invalid format. Expected format: P0W0015L0"; statusTxt.style.color = "red";
                 resultBoard.style.display = "none";
             }
         });
